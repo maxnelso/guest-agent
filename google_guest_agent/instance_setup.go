@@ -100,6 +100,12 @@ func agentInit(ctx context.Context) error {
 	} else {
 		// Linux instance setup.
 
+		if config.Section("Snapshots").Key("enabled").MustBool(false) {
+			startSnapshotListener(snapshotTestMode, snapshotServiceTestPort)
+		} else {
+			logger.Infof("Snapshot listener disabled")
+		}
+
 		// These scripts are run regardless of metadata/network access and config options.
 		for _, script := range []string{"optimize_local_ssd", "set_multiqueue"} {
 			if config.Section("InstanceSetup").Key(script).MustBool(true) {

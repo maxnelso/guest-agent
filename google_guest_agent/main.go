@@ -18,6 +18,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -40,6 +41,9 @@ var (
 	oldMetadata, newMetadata *metadata
 	config                   *ini.File
 	osRelease                release
+	action                   string
+	snapshotServiceTestPort  int
+	snapshotTestMode         bool
 )
 
 const (
@@ -90,6 +94,19 @@ func parseConfig(file string) (*ini.File, error) {
 	return cfg, nil
 }
 
+func setConfig() {
+	var err error
+	cfgfile := configPath
+	if runtime.GOOS == "windows" {
+		cfgfile = winConfigPath
+	}
+
+	config, err = parseConfig(cfgfile)
+	if err != nil && !os.IsNotExist(err) {
+		logger.Errorf("Error parsing config %s: %s", cfgfile, err)
+	}
+}
+
 func closeFile(c io.Closer) {
 	err := c.Close()
 	if err != nil {
@@ -130,15 +147,7 @@ func run(ctx context.Context) {
 		logger.Warningf("Couldn't detect OS release")
 	}
 
-	cfgfile := configPath
-	if runtime.GOOS == "windows" {
-		cfgfile = winConfigPath
-	}
-
-	config, err = parseConfig(cfgfile)
-	if err != nil && !os.IsNotExist(err) {
-		logger.Errorf("Error parsing config %s: %s", cfgfile, err)
-	}
+	setConfig()
 
 	if err := agentInit(ctx); err != nil {
 		logger.Errorf("Error running instance setup: %v", err)
@@ -272,12 +281,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	var action string
-	if len(os.Args) < 2 {
-		action = "run"
-	} else {
-		action = os.Args[1]
-	}
+	flag.StringVar(&action, "action", "run", "the action to run")
+	flag.IntVar(&snapshotServiceTestPort, "snapshot_service_test_port", 0, "the test snapshot service port")
+	flag.BoolVar(&snapshotTestMode, "snapshotTestMode", false, "whether to run in test mode or not")
+
+	flag.Parse()
 
 	if action == "noservice" {
 		run(ctx)
